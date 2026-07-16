@@ -1,7 +1,7 @@
 [project]
-name = "latuapasta-ordering-backend"
+name = "pastaco-ordering-backend"
 version = "0.1.0"
-description = "Backend for the La Tua Pasta batch ordering planner (Centric + ERP + Power BI)"
+description = "Backend for the Pasta co batch ordering planner (Centric + ERP + Power BI)"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.110",
