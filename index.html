@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>La Tua Pasta — Batch Ordering Planner</title>
+<!--
+  ============================================================================
+  LA TUA PASTA  —  BATCH ORDERING PLANNER  (base framework / prototype)
+  ----------------------------------------------------------------------------
+  Purpose: Take a batch of customer orders (product + kg) that arrive via
+           WhatsApp, and work out how much of each RAW INGREDIENT must be
+           ordered — after (a) exploding each product into its pasta-dough +
+           filling ingredients, (b) applying a process-YIELD % to allow for
+           production waste, and (c) checking current stock.
+
+  Data model is built from La Tua Pasta's real products (scraped July 2026):
+    • Every filled product = ~50% pasta dough + ~50% filling by weight.
+    • Standard dough = Tipo 00 flour + pasteurised egg (30%) + durum wheat + salt.
+    • Vegan line (Pea & Shallot) swaps egg for water.
+    • Recipes below use the real published ingredient breakdowns where known
+      (Spinach & Ricotta and Braised Beef are exact); others are close
+      estimates from the product descriptions — tune the %s to your specs.
+
+  Ingredients / recipes / yields / stock will ultimately come from CENTRIC.
+  Results can be pushed to POWER BI. Both are wired in the INTEGRATION LAYER
+  at the bottom of the <script> — that is the ONLY section you change to go
+  live. Everything else (UI + calculation) stays the same.
+
+  Runs with NO server and NO internet. Just double-click. All data is MOCK.
+  ============================================================================
+-->
+<style>
+  :root {
+    --bg: #14100c;
+    --panel: #211a13;
+    --panel-2: #2b2318;
+    --line: #3a2f21;
+    --text: #f3ece0;
+    --muted: #b6a689;
+    --accent: #4a8f4f;      /* basil green */
+    --accent-2: #d98a3d;    /* warm terracotta */
+    --wheat: #e0b84a;
+    --danger: #d9603f;      /* tomato */
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  h1, h2, h3 { font-weight: 600; margin: 0 0 .5rem; }
+  button {
+    font: inherit; cursor: pointer; border: none; border-radius: 8px;
+    padding: .55rem .9rem; background: var(--accent); color: #f3ece0;
+    font-weight: 600;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  button.ghost { background: transparent; color: var(--muted); }
+  button:hover { filter: brightness(1.1); }
+  input, textarea, select {
+    font: inherit; background: var(--bg); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: .5rem .6rem;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: .12rem .5rem; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.ok { background: rgba(74,143,79,.18); color: #7fc784; }
+  .pill.buy { background: rgba(217,96,63,.18); color: #f0906f; }
+  .pill.dough { background: rgba(224,184,74,.16); color: var(--wheat); }
+  .pill.fill { background: rgba(217,138,61,.16); color: var(--accent-2); }
+  .muted { color: var(--muted); }
+  .hidden { display: none !important; }
+
+  /* ---- Login ---- */
+  #login {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: radial-gradient(1200px 600px at 50% -10%, #2b2013, var(--bg));
+  }
+  .login-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 2rem; width: 340px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .login-card h1 { font-size: 1.35rem; }
+  .login-card label { display: block; margin: .9rem 0 .3rem; color: var(--muted); font-size: 13px; }
+  .login-card input { width: 100%; }
+  .login-card button { width: 100%; margin-top: 1.2rem; }
+
+  /* ---- App shell ---- */
+  header.appbar {
+    display: flex; align-items: center; gap: 1rem;
+    padding: .8rem 1.2rem; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header .brand { font-weight: 700; font-size: 1.05rem; }
+  header .brand span { color: var(--accent-2); }
+  .sync-status { margin-left: auto; font-size: 12px; color: var(--muted); }
+  nav.tabs { display: flex; gap: .3rem; padding: 0 1.2rem; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  nav.tabs button {
+    background: transparent; color: var(--muted); border-radius: 0;
+    border-bottom: 2px solid transparent; padding: .8rem 1rem; font-weight: 600;
+  }
+  nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent-2); }
+  main { padding: 1.4rem; max-width: 1200px; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.2rem; margin-bottom: 1.2rem; }
+  .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+  .grid-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 1rem; }
+  .kpi { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; }
+  .kpi .v { font-size: 1.6rem; font-weight: 700; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .toolbar { display: flex; gap: .6rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  .hint { font-size: 12px; color: var(--muted); background: var(--panel-2); border-left: 3px solid var(--accent-2); padding: .6rem .8rem; border-radius: 6px; margin: .6rem 0; }
+  .table-wrap { overflow-x: auto; }
+  textarea.wa { width: 100%; min-height: 150px; font-family: ui-monospace, "Cascadia Code", monospace; }
+  .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 1rem; }
+</style>
+</head>
+<body>
+
+<!-- ========================= LOGIN ========================= -->
+<div id="login">
+  <div class="login-card">
+    <h1>🍝 La Tua Pasta</h1>
+    <p class="muted" style="font-size:13px;margin:.2rem 0 0">Batch Ordering Planner — sign in</p>
+    <label>Username</label>
+    <input id="user" value="admin" autocomplete="username" />
+    <label>Password</label>
+    <input id="pass" type="password" value="admin" autocomplete="current-password" />
+    <button onclick="login()">Sign in</button>
+    <p class="muted" style="font-size:11px;margin-top:1rem;text-align:center">
+      Demo login: <b>admin / admin</b>. Replace with real auth (SSO / Centric) before go-live.
+    </p>
+  </div>
+</div>
+
+<!-- ========================= APP ========================= -->
+<div id="app" class="hidden">
+  <header class="appbar">
+    <div class="brand">🍝 La Tua Pasta <span>· Ordering Planner</span></div>
+    <div class="sync-status" id="syncStatus">Data source: <b>Mock</b></div>
+    <button class="ghost" onclick="logout()">Sign out</button>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="plan" class="active" onclick="showTab('plan')">📋 Order Batch &amp; Plan</button>
+    <button data-tab="requirements" onclick="showTab('requirements')">🧮 Purchasing List</button>
+    <button data-tab="stock" onclick="showTab('stock')">📦 Ingredients &amp; Stock</button>
+    <button data-tab="recipes" onclick="showTab('recipes')">📖 Recipes &amp; Yields</button>
+  </nav>
+
+  <main>
+    <!-- ---------- TAB: PLAN ---------- -->
+    <section id="tab-plan">
+      <div class="card">
+        <h2>1. Import orders from WhatsApp</h2>
+        <div class="hint">
+          Paste the raw WhatsApp text and click <b>Parse</b>. The parser matches product names and
+          quantities in <b>kg</b> (e.g. “40kg Spinach &amp; Ricotta Ravioli”). In production this is
+          replaced by a WhatsApp Business API webhook — see <code>importWhatsAppOrders()</code>.
+        </div>
+        <textarea id="waText" class="wa">Hi team, order for Friday delivery please:
+40kg Spinach & Ricotta Ravioli
+25kg Braised Beef Ravioli
+15kg Four Cheese Ravioli
+30kg Tomato & Mozzarella Tortelloni
+20kg Pumpkin & Ricotta Ravioli
+12kg Nduja & Mascarpone Tortelloni
+Thanks!</textarea>
+        <div class="toolbar" style="margin-top:.8rem">
+          <button onclick="parseWhatsApp()">Parse WhatsApp text</button>
+          <button class="secondary" onclick="addOrderRow()">+ Add order manually</button>
+          <span class="muted" id="parseMsg"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. Order batch</h2>
+        <div class="table-wrap">
+          <table id="ordersTable">
+            <thead>
+              <tr><th>Customer / note</th><th>Product</th><th class="num">Qty (kg)</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="toolbar" style="margin-top:1rem">
+          <button onclick="runCalculation()">🧮 Calculate ingredient requirements</button>
+          <button class="secondary" onclick="clearOrders()">Clear batch</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB: REQUIREMENTS ---------- -->
+    <section id="tab-requirements" class="hidden">
+      <div class="card">
+        <div class="grid-kpi" id="kpis"></div>
+      </div>
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">Purchasing list — what to order</h2>
+          <div style="margin-left:auto" class="row">
+            <button class="secondary" onclick="exportCSV()">⬇ Export CSV</button>
+            <button class="secondary" onclick="pushToPowerBI()">📊 Push to Power BI</button>
+          </div>
+        </div>
+        <div class="hint">
+          <b>Raw needed = (grams per kg × order kg) ÷ yield%</b>, summed across the batch.
+          <b>To order = max(0, raw needed − current stock)</b>, rounded up to the supplier pack size.
+          Red rows need purchasing; green rows are covered by stock.
+        </div>
+        <div class="table-wrap">
+          <table id="reqTable">
+            <thead>
+              <tr>
+                <th>Ingredient</th>
+                <th>Supplier</th>
+                <th class="num">Needed</th>
+                <th class="num">In stock</th>
+                <th class="num">Gap</th>
+                <th class="num">Pack</th>
+                <th class="num">Order (packs)</th>
+                <th class="num">Order qty</th>
+                <th class="num">Est. cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted" id="reqEmpty">Run a calculation from the <b>Order Batch &amp; Plan</b> tab to see results.</p>
+      </div>
+    </section>
+
+    <!-- ---------- TAB: STOCK ---------- -->
+    <section id="tab-stock" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">Ingredients &amp; current stock</h2>
+          <button class="secondary" style="margin-left:auto" onclick="syncFromCentric()">🔄 Sync from Centric</button>
+        </div>
+        <div class="hint">
+          This mirrors your Centric ingredient master + live stock. Edit values here to test
+          scenarios; in production it is read-only and refreshed by <code>syncFromCentric()</code>.
+        </div>
+        <div class="table-wrap">
+          <table id="stockTable">
+            <thead>
+              <tr>
+                <th>Ingredient</th><th>Unit</th><th class="num">Current stock</th>
+                <th class="num">Pack size</th><th class="num">Cost / unit</th><th>Supplier</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB: RECIPES ---------- -->
+    <section id="tab-recipes" class="hidden">
+      <div class="card">
+        <div class="toolbar">
+          <h2 style="margin:0">Recipes &amp; yields — top 10 products</h2>
+          <button class="secondary" style="margin-left:auto" onclick="syncFromCentric()">🔄 Sync from Centric</button>
+        </div>
+        <div class="hint">
+          Each product is broken into <span class="pill dough">dough</span> and
+          <span class="pill fill">filling</span> ingredients, expressed as <b>grams per 1&nbsp;kg of
+          finished product</b>. The <b>process yield %</b> allows for production waste — lower yield
+          means more raw material is ordered to hit the finished weight.
+        </div>
+        <div class="recipe-grid" id="recipeCards"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ==========================================================================
+   1. DATA  (MOCK — replace via the INTEGRATION LAYER at the bottom)
+   ==========================================================================
+   Units: kg for solids, L for liquids. `pack` = you can only buy in multiples
+   of this from the supplier. Costs are illustrative UK wholesale ballparks.
+*/
+let INGREDIENTS = [
+  // --- Dough / dry ---
+  { id:'flour00',    name:'Tipo 00 Flour',                 unit:'kg', stock:180, pack:25, cost:1.10, supplier:'Molino Italiano' },
+  { id:'durum',      name:'Durum Wheat Semolina',          unit:'kg', stock:90,  pack:25, cost:1.30, supplier:'Molino Italiano' },
+  { id:'egg',        name:'Pasteurised Free-Range Egg',    unit:'kg', stock:40,  pack:20, cost:3.60, supplier:'British Eggs Ltd' },
+  { id:'salt',       name:'Fine Sea Salt',                 unit:'kg', stock:60,  pack:25, cost:0.55, supplier:'Pantry Supplies' },
+  { id:'riceflour',  name:'Rice Flour (dusting)',          unit:'kg', stock:40,  pack:25, cost:1.40, supplier:'Molino Italiano' },
+  { id:'water',      name:'Water',                         unit:'L',  stock:9999,pack:1,  cost:0.00, supplier:'Mains' },
+  // --- Dairy ---
+  { id:'ricotta',    name:'Ricotta (Milk)',                unit:'kg', stock:22,  pack:6,  cost:4.50, supplier:'Latteria UK' },
+  { id:'grana',      name:'Italian Grated Cheese (Grana)', unit:'kg', stock:14,  pack:1,  cost:9.20, supplier:'Latteria UK' },
+  { id:'goat',       name:"Goat's Cheese",                 unit:'kg', stock:6,   pack:2,  cost:8.80, supplier:'Latteria UK' },
+  { id:'gorgonzola', name:'Gorgonzola',                    unit:'kg', stock:5,   pack:1.5,cost:7.60, supplier:'Latteria UK' },
+  { id:'mozzarella', name:'Mozzarella',                    unit:'kg', stock:10,  pack:3,  cost:5.40, supplier:'Latteria UK' },
+  { id:'mascarpone', name:'Mascarpone',                    unit:'kg', stock:8,   pack:2,  cost:4.80, supplier:'Latteria UK' },
+  // --- Produce / veg ---
+  { id:'spinach',    name:'Spinach',                       unit:'kg', stock:18,  pack:5,  cost:2.80, supplier:'Fresh Produce Co' },
+  { id:'garlic',     name:'Garlic',                        unit:'kg', stock:4,   pack:3,  cost:3.20, supplier:'Fresh Produce Co' },
+  { id:'pumpkin',    name:'Pumpkin',                       unit:'kg', stock:30,  pack:10, cost:1.40, supplier:'Fresh Produce Co' },
+  { id:'mushroom',   name:'Mixed Italian Mushrooms',       unit:'kg', stock:15,  pack:5,  cost:4.20, supplier:'Fresh Produce Co' },
+  { id:'peas',       name:'Garden Peas',                   unit:'kg', stock:20,  pack:5,  cost:1.60, supplier:'Fresh Produce Co' },
+  { id:'shallot',    name:'Shallots',                      unit:'kg', stock:16,  pack:10, cost:2.20, supplier:'Fresh Produce Co' },
+  { id:'carrot',     name:'Carrots',                       unit:'kg', stock:40,  pack:10, cost:0.75, supplier:'Fresh Produce Co' },
+  { id:'onion',      name:'Onions',                        unit:'kg', stock:40,  pack:10, cost:0.70, supplier:'Fresh Produce Co' },
+  { id:'celery',     name:'Celery',                        unit:'kg', stock:12,  pack:5,  cost:1.60, supplier:'Fresh Produce Co' },
+  { id:'beetroot',   name:'Beetroot',                      unit:'kg', stock:25,  pack:10, cost:1.20, supplier:'Fresh Produce Co' },
+  { id:'tomato',     name:'Sun-dried Tomato',              unit:'kg', stock:8,   pack:5,  cost:3.40, supplier:'Cantina Supplies' },
+  // --- Meat ---
+  { id:'beef',       name:'Braising Beef',                 unit:'kg', stock:20,  pack:5,  cost:8.60, supplier:'Smithfield Meats' },
+  { id:'nduja',      name:'Nduja Sausage',                 unit:'kg', stock:6,   pack:3,  cost:9.20, supplier:'Salumeria Italiana' },
+  // --- Store cupboard / herbs / oils ---
+  { id:'breadcrumbs',name:'Breadcrumbs',                   unit:'kg', stock:25,  pack:10, cost:1.50, supplier:'Pantry Supplies' },
+  { id:'sunflower',  name:'Sunflower Oil',                 unit:'L',  stock:30,  pack:10, cost:1.80, supplier:'Oils Direct' },
+  { id:'oliveoil',   name:'Extra Virgin Olive Oil',        unit:'L',  stock:25,  pack:5,  cost:7.20, supplier:'Oils Direct' },
+  { id:'redwine',    name:'Red Wine (cooking)',            unit:'L',  stock:18,  pack:6,  cost:4.20, supplier:'Cantina Supplies' },
+  { id:'nutmeg',     name:'Nutmeg (ground)',               unit:'kg', stock:2,   pack:1,  cost:19.0, supplier:'Spice Traders' },
+  { id:'pepper',     name:'Black Pepper (ground)',         unit:'kg', stock:2,   pack:1,  cost:14.5, supplier:'Spice Traders' },
+  { id:'rosemary',   name:'Fresh Rosemary',                unit:'kg', stock:2,   pack:1,  cost:12.0, supplier:'Fresh Produce Co' },
+  { id:'sage',       name:'Fresh Sage',                    unit:'kg', stock:1.5, pack:1,  cost:13.0, supplier:'Fresh Produce Co' },
+];
+
+/*  RECIPES — top 10 most popular La Tua Pasta products.
+    `yield`  = process yield (fraction). 0.90 => 10% waste, so you must input
+               1 / 0.90 = 1.111 kg of raw material to make 1 kg finished.
+    `pcsPerKg` = approx finished pieces per kg (display only).
+    `items`  = grams of each ingredient per 1 kg of FINISHED product,
+               tagged 'dough' or 'fill'. Each product ≈ 500 g dough + 500 g
+               filling (La Tua Pasta's stated 50/50 split), + rice-flour dusting.
+
+    Reusable dough blocks (per 1 kg finished product): */
+const DOUGH_EGG = [           // standard 30%-egg dough (500 g)
+  { id:'flour00', qty:240, type:'dough' },
+  { id:'egg',     qty:150, type:'dough' },
+  { id:'durum',   qty:100, type:'dough' },
+  { id:'salt',    qty:10,  type:'dough' },
+  { id:'riceflour', qty:8, type:'dough' },   // dusting
+];
+const DOUGH_VEGAN = [          // vegan Pea & Shallot dough: durum + water (500 g)
+  { id:'durum', qty:320, type:'dough' },
+  { id:'water', qty:180, type:'dough' },
+  { id:'riceflour', qty:8, type:'dough' },
+];
+
+let RECIPES = [
+  // 1 — exact published breakdown
+  { id:'spinach_ric_rav', name:'Spinach & Ricotta Ravioli', shape:'Ravioli', pcsPerKg:75, yield:0.92,
+    items:[ ...DOUGH_EGG,
+      {id:'spinach',qty:195,type:'fill'},{id:'ricotta',qty:195,type:'fill'},{id:'grana',qty:70,type:'fill'},
+      {id:'sunflower',qty:20,type:'fill'},{id:'garlic',qty:10,type:'fill'},{id:'salt',qty:7,type:'fill'},{id:'nutmeg',qty:3,type:'fill'} ] },
+
+  // 2 — exact published breakdown
+  { id:'beef_rav', name:'Braised Beef Ravioli', shape:'Ravioli', pcsPerKg:75, yield:0.88,
+    items:[ ...DOUGH_EGG,
+      {id:'beef',qty:225,type:'fill'},{id:'carrot',qty:50,type:'fill'},{id:'onion',qty:45,type:'fill'},
+      {id:'celery',qty:30,type:'fill'},{id:'breadcrumbs',qty:40,type:'fill'},{id:'grana',qty:30,type:'fill'},
+      {id:'redwine',qty:30,type:'fill'},{id:'water',qty:30,type:'fill'},{id:'oliveoil',qty:10,type:'fill'},
+      {id:'rosemary',qty:5,type:'fill'},{id:'salt',qty:3,type:'fill'},{id:'pepper',qty:2,type:'fill'} ] },
+
+  // 3 — estimate from description (ricotta, goat, Grana, gorgonzola)
+  { id:'four_cheese_rav', name:'Four Cheese Ravioli', shape:'Ravioli', pcsPerKg:75, yield:0.93,
+    items:[ ...DOUGH_EGG,
+      {id:'ricotta',qty:200,type:'fill'},{id:'goat',qty:100,type:'fill'},{id:'gorgonzola',qty:100,type:'fill'},
+      {id:'grana',qty:90,type:'fill'},{id:'salt',qty:10,type:'fill'} ] },
+
+  // 4 — estimate (pumpkin, ricotta, breadcrumbs, sage)
+  { id:'pumpkin_ric_rav', name:'Pumpkin & Ricotta Ravioli', shape:'Ravioli', pcsPerKg:75, yield:0.90,
+    items:[ ...DOUGH_EGG,
+      {id:'pumpkin',qty:275,type:'fill'},{id:'ricotta',qty:125,type:'fill'},{id:'breadcrumbs',qty:50,type:'fill'},
+      {id:'grana',qty:30,type:'fill'},{id:'sage',qty:8,type:'fill'},{id:'salt',qty:8,type:'fill'},{id:'nutmeg',qty:4,type:'fill'} ] },
+
+  // 5 — estimate (mixed mushrooms + cheese)
+  { id:'mushroom_tort', name:'Mushroom & Cheese Tortelloni', shape:'Tortelloni', pcsPerKg:33, yield:0.90,
+    items:[ ...DOUGH_EGG,
+      {id:'mushroom',qty:300,type:'fill'},{id:'ricotta',qty:100,type:'fill'},{id:'grana',qty:60,type:'fill'},
+      {id:'breadcrumbs',qty:25,type:'fill'},{id:'garlic',qty:5,type:'fill'},{id:'oliveoil',qty:5,type:'fill'},{id:'salt',qty:5,type:'fill'} ] },
+
+  // 6 — VEGAN, water dough (peas, shallots, EVOO)
+  { id:'pea_shallot_veg', name:'Pea & Shallot Ravioli (Vegan)', shape:'Ravioli', pcsPerKg:75, yield:0.91,
+    items:[ ...DOUGH_VEGAN,
+      {id:'peas',qty:355,type:'fill'},{id:'shallot',qty:100,type:'fill'},{id:'oliveoil',qty:30,type:'fill'},
+      {id:'salt',qty:10,type:'fill'},{id:'pepper',qty:5,type:'fill'} ] },
+
+  // 7 — same filling as #1, tortelloni shape (lower yield, hand-folded)
+  { id:'spinach_ric_tort', name:'Spinach & Ricotta Tortelloni', shape:'Tortelloni', pcsPerKg:33, yield:0.90,
+    items:[ ...DOUGH_EGG,
+      {id:'spinach',qty:195,type:'fill'},{id:'ricotta',qty:195,type:'fill'},{id:'grana',qty:70,type:'fill'},
+      {id:'sunflower',qty:20,type:'fill'},{id:'garlic',qty:10,type:'fill'},{id:'salt',qty:7,type:'fill'},{id:'nutmeg',qty:3,type:'fill'} ] },
+
+  // 8 — estimate (mozzarella, sun-dried tomato, breadcrumbs)
+  { id:'tomato_mozz_tort', name:'Tomato & Mozzarella Tortelloni', shape:'Tortelloni', pcsPerKg:33, yield:0.91,
+    items:[ ...DOUGH_EGG,
+      {id:'mozzarella',qty:200,type:'fill'},{id:'tomato',qty:150,type:'fill'},{id:'breadcrumbs',qty:75,type:'fill'},
+      {id:'grana',qty:45,type:'fill'},{id:'oliveoil',qty:20,type:'fill'},{id:'salt',qty:10,type:'fill'} ] },
+
+  // 9 — estimate (nduja, mascarpone)
+  { id:'nduja_masc_tort', name:'Nduja & Mascarpone Tortelloni', shape:'Tortelloni', pcsPerKg:33, yield:0.90,
+    items:[ ...DOUGH_EGG,
+      {id:'nduja',qty:225,type:'fill'},{id:'mascarpone',qty:175,type:'fill'},{id:'grana',qty:50,type:'fill'},
+      {id:'breadcrumbs',qty:40,type:'fill'},{id:'salt',qty:10,type:'fill'} ] },
+
+  // 10 — estimate (beetroot, goat cheese)
+  { id:'beetroot_goat_rav', name:'Beetroot & Goat Cheese Ravioli', shape:'Ravioli', pcsPerKg:75, yield:0.90,
+    items:[ ...DOUGH_EGG,
+      {id:'beetroot',qty:250,type:'fill'},{id:'goat',qty:150,type:'fill'},{id:'ricotta',qty:60,type:'fill'},
+      {id:'breadcrumbs',qty:20,type:'fill'},{id:'oliveoil',qty:10,type:'fill'},{id:'salt',qty:10,type:'fill'} ] },
+];
+
+// Current batch of orders (product + kg). Built from WhatsApp import / manual.
+let ORDERS = [];
+let LAST_RESULT = null;
+
+// AUTO-DETECT MODE:
+//   • Opened as a file (file://)  -> standalone DEMO using the mock data above.
+//   • Served by the backend (http) -> LIVE mode: data comes from Centric/ERP via
+//     the backend, and Power BI pushes go through it. No code change needed —
+//     just run the backend and open http://localhost:8000.
+const USE_BACKEND = location.protocol.startsWith('http');
+
+/* ==========================================================================
+   2. AUTH  (demo only — swap in the integration layer)
+   ========================================================================== */
+function login() {
+  const u = document.getElementById('user').value.trim();
+  const p = document.getElementById('pass').value;
+  if (authenticate(u, p)) {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    renderStock(); renderRecipes(); renderOrders();
+    if (USE_BACKEND) syncFromCentric();   // pull live data from Centric/ERP
+  } else {
+    alert('Invalid login. (Demo: admin / admin)');
+  }
+}
+function logout() {
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+}
+
+/* ==========================================================================
+   3. TAB NAVIGATION
+   ========================================================================== */
+function showTab(name) {
+  ['plan','requirements','stock','recipes'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('hidden', t !== name);
+  });
+  document.querySelectorAll('nav.tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name));
+}
+
+/* ==========================================================================
+   4. WHATSAPP PARSER
+   Finds "<number> kg <product name>". Matches on the distinctive words of a
+   product name so word order / extra words don't matter. Demo-grade — replace
+   with the Business API webhook for production.
+   ========================================================================== */
+function parseWhatsApp(text) {
+  const raw = (typeof text === 'string') ? text : document.getElementById('waText').value;
+  const found = [];
+  raw.split(/\n|,|\band\b/i).forEach(line => {
+    const qtyMatch = line.match(/(\d+(?:\.\d+)?)\s*kg/i) || line.match(/(\d+(?:\.\d+)?)/);
+    if (!qtyMatch) return;
+    const qty = parseFloat(qtyMatch[1]);
+    const best = bestRecipeMatch(line);
+    if (best) found.push({ note:'WhatsApp', recipeId:best.id, qty });
+  });
+  if (found.length === 0) {
+    document.getElementById('parseMsg').textContent = 'No recognised products found — add manually below.';
+    return;
+  }
+  ORDERS = found;
+  renderOrders();
+  document.getElementById('parseMsg').textContent = `Parsed ${found.length} order line(s).`;
+}
+// Score each recipe by how many of its keywords appear in the line.
+function bestRecipeMatch(line) {
+  const L = line.toLowerCase();
+  let best = null, bestScore = 0;
+  RECIPES.forEach(r => {
+    const words = r.name.toLowerCase().replace(/[&()]/g,' ').split(/\s+/).filter(w => w.length > 2);
+    const score = words.filter(w => L.includes(w)).length
+                + (L.includes(r.shape.toLowerCase()) ? 0.5 : 0);
+    if (score > bestScore) { bestScore = score; best = r; }
+  });
+  return bestScore >= 1 ? best : null;
+}
+
+/* ==========================================================================
+   5. ORDERS TABLE
+   ========================================================================== */
+function renderOrders() {
+  const tb = document.querySelector('#ordersTable tbody');
+  tb.innerHTML = '';
+  ORDERS.forEach((o, i) => {
+    const tr = document.createElement('tr');
+    const options = RECIPES.map(r =>
+      `<option value="${r.id}" ${r.id===o.recipeId?'selected':''}>${r.name}</option>`).join('');
+    tr.innerHTML = `
+      <td><input value="${o.note||''}" style="width:140px" onchange="ORDERS[${i}].note=this.value"></td>
+      <td><select style="max-width:260px" onchange="ORDERS[${i}].recipeId=this.value">${options}</select></td>
+      <td class="num"><input type="number" min="0" step="0.5" value="${o.qty}" style="width:90px;text-align:right"
+            onchange="ORDERS[${i}].qty=parseFloat(this.value)||0"></td>
+      <td><button class="ghost" onclick="removeOrder(${i})">✕</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+function addOrderRow() { ORDERS.push({ note:'', recipeId:RECIPES[0].id, qty:0 }); renderOrders(); }
+function removeOrder(i) { ORDERS.splice(i, 1); renderOrders(); }
+function clearOrders() { ORDERS = []; renderOrders(); document.getElementById('parseMsg').textContent=''; }
+
+/* ==========================================================================
+   6. THE ENGINE  —  explode products -> ingredients, apply yield, vs stock
+   ==========================================================================
+   For each order (product, kg):
+     rawFactor = orderKg / yield            (yield loss => order more)
+     ingredient qty (kg or L) = gramsPerKg/1000 * rawFactor
+   Aggregate per ingredient, then compare to stock and round to pack size.
+*/
+function calculateRequirements() {
+  const required = {};                 // ingredientId -> total qty needed (kg/L)
+  let totalFinished = 0, totalRaw = 0;
+  ORDERS.forEach(o => {
+    const recipe = RECIPES.find(r => r.id === o.recipeId);
+    if (!recipe || !o.qty) return;
+    const rawFactor = o.qty / recipe.yield;   // kg of raw input to make o.qty finished
+    totalFinished += o.qty;
+    totalRaw += rawFactor;
+    recipe.items.forEach(it => {
+      required[it.id] = (required[it.id] || 0) + (it.qty / 1000) * rawFactor;
+    });
+  });
+
+  const lines = Object.keys(required).map(id => {
+    const ing = INGREDIENTS.find(x => x.id === id);
+    const need = required[id];
+    const gap = Math.max(0, need - ing.stock);
+    const packs = gap > 0 ? Math.ceil(gap / ing.pack) : 0;
+    const orderQty = packs * ing.pack;
+    const cost = orderQty * ing.cost;
+    return { id, name:ing.name, supplier:ing.supplier, unit:ing.unit,
+             need, stock:ing.stock, gap, pack:ing.pack, packs, orderQty, cost,
+             status: gap > 0 ? 'buy' : 'ok' };
+  }).sort((a,b) => b.cost - a.cost || b.gap - a.gap);
+
+  return {
+    lines,
+    totalCost: lines.reduce((s,l) => s + l.cost, 0),
+    toBuyCount: lines.filter(l => l.status === 'buy').length,
+    orderLines: ORDERS.filter(o => o.qty > 0).length,
+    totalFinished, totalRaw,
+  };
+}
+
+function runCalculation() {
+  if (ORDERS.filter(o => o.qty > 0).length === 0) {
+    alert('Add at least one order (with a quantity) first.');
+    return;
+  }
+  LAST_RESULT = calculateRequirements();
+  renderRequirements(LAST_RESULT);
+  showTab('requirements');
+}
+
+function renderRequirements(res) {
+  const waste = res.totalRaw - res.totalFinished;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="v">${res.orderLines}</div><div class="l">Order lines</div></div>
+    <div class="kpi"><div class="v">${fmt(res.totalFinished)} kg</div><div class="l">Finished product ordered</div></div>
+    <div class="kpi"><div class="v">${fmt(res.totalRaw)} kg</div><div class="l">Raw input (incl. ${fmt(waste)} kg yield loss)</div></div>
+    <div class="kpi"><div class="v" style="color:var(--danger)">${res.toBuyCount}</div><div class="l">Ingredients to purchase</div></div>
+    <div class="kpi"><div class="v" style="color:var(--wheat)">£${res.totalCost.toFixed(2)}</div><div class="l">Est. purchase cost</div></div>`;
+
+  const tb = document.querySelector('#reqTable tbody');
+  tb.innerHTML = '';
+  res.lines.forEach(l => {
+    const badge = l.status === 'buy'
+      ? '<span class="pill buy">Order</span>' : '<span class="pill ok">In stock</span>';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${l.name}</td>
+      <td class="muted">${l.supplier}</td>
+      <td class="num">${fmt(l.need)} ${l.unit}</td>
+      <td class="num">${fmt(l.stock)} ${l.unit}</td>
+      <td class="num">${l.gap>0?fmt(l.gap):'—'}</td>
+      <td class="num">${l.pack} ${l.unit}</td>
+      <td class="num">${l.packs||'—'}</td>
+      <td class="num">${l.orderQty>0?fmt(l.orderQty)+' '+l.unit:'—'}</td>
+      <td class="num">${l.cost>0?'£'+l.cost.toFixed(2):'—'}</td>
+      <td>${badge}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('reqEmpty').classList.toggle('hidden', res.lines.length > 0);
+}
+function fmt(n){ return Number.isInteger(n) ? n : n.toFixed(2); }
+
+/* ==========================================================================
+   7. STOCK + RECIPE VIEWS
+   ========================================================================== */
+function renderStock() {
+  const tb = document.querySelector('#stockTable tbody');
+  tb.innerHTML = '';
+  INGREDIENTS.forEach((ing, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${ing.name}</td>
+      <td class="muted">${ing.unit}</td>
+      <td class="num"><input type="number" step="0.1" value="${ing.stock}" style="width:90px;text-align:right"
+            onchange="INGREDIENTS[${i}].stock=parseFloat(this.value)||0"></td>
+      <td class="num">${ing.pack} ${ing.unit}</td>
+      <td class="num">£${ing.cost.toFixed(2)}</td>
+      <td class="muted">${ing.supplier}</td>`;
+    tb.appendChild(tr);
+  });
+}
+function renderRecipes() {
+  const wrap = document.getElementById('recipeCards');
+  wrap.innerHTML = '';
+  RECIPES.forEach(r => {
+    const rows = r.items.map(it => {
+      const ing = INGREDIENTS.find(x => x.id === it.id);
+      const tag = it.type === 'dough' ? '<span class="pill dough">dough</span>'
+                                      : '<span class="pill fill">filling</span>';
+      return `<tr><td>${ing.name} ${tag}</td><td class="num">${it.qty} g</td></tr>`;
+    }).join('');
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.background = 'var(--panel-2)';
+    div.style.margin = '0';
+    div.innerHTML = `
+      <h3 style="margin-bottom:.2rem">${r.name}</h3>
+      <div class="muted" style="font-size:12px;margin-bottom:.6rem">
+        ${r.shape} · ~${r.pcsPerKg} pcs/kg · process yield <b style="color:var(--wheat)">${Math.round(r.yield*100)}%</b>
+      </div>
+      <table>
+        <thead><tr><th>Ingredient (per kg finished)</th><th class="num">g/kg</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    wrap.appendChild(div);
+  });
+}
+
+/* ==========================================================================
+   8. EXPORT
+   ========================================================================== */
+function exportCSV() {
+  if (!LAST_RESULT) { alert('Run a calculation first.'); return; }
+  const header = ['Ingredient','Supplier','Needed','Unit','InStock','Gap','PackSize','OrderPacks','OrderQty','EstCost'];
+  const rows = LAST_RESULT.lines.map(l =>
+    [l.name,l.supplier,fmt(l.need),l.unit,fmt(l.stock),fmt(l.gap),l.pack,l.packs,fmt(l.orderQty),l.cost.toFixed(2)]);
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'latuapasta-purchasing-list.csv';
+  a.click();
+}
+
+/* ==========================================================================
+   ██  INTEGRATION LAYER  ██
+   --------------------------------------------------------------------------
+   The ONLY section to change to go live. Each function uses MOCK behaviour;
+   replace the body with real API calls. UI + engine above stay unchanged.
+   ========================================================================== */
+
+// ---- AUTH -------------------------------------------------------------
+function authenticate(username, password) {
+  return username === 'admin' && password === 'admin';   // DEMO ONLY
+}
+
+// ---- CENTRIC: pull ingredients, recipes (BOMs), yields, stock ---------
+async function syncFromCentric() {
+  // LIVE mode: pull ingredients (Centric materials + ERP stock) and recipes
+  // (Centric BOMs + yields) from the backend. The backend holds the tokens and
+  // does the real API calls — see backend/sources.py.
+  if (USE_BACKEND) {
+    setSyncStatus('Syncing from Centric / ERP…');
+    try {
+      const [ings, recs] = await Promise.all([
+        fetch('/api/ingredients').then(r => r.json()),
+        fetch('/api/recipes').then(r => r.json()),
+      ]);
+      INGREDIENTS = ings;
+      RECIPES = recs;
+      renderStock(); renderRecipes(); renderOrders();
+      setSyncStatus('Data source: <b>Centric + ERP</b> ✓');
+    } catch (e) {
+      setSyncStatus('Sync failed: ' + e.message);
+    }
+    return;
+  }
+  // DEMO mode (opened as a file): just refresh from the built-in mock data.
+  setSyncStatus('Syncing from Centric…');
+  await new Promise(r => setTimeout(r, 600));              // simulate network
+  renderStock(); renderRecipes();
+  setSyncStatus('Data source: <b>Mock</b> · synced ✓');
+}
+
+// ---- WHATSAPP: import incoming orders ---------------------------------
+async function importWhatsAppOrders() {
+  /*  const res  = await fetch('/api/whatsapp/unprocessed');
+      const msgs = await res.json();
+      msgs.forEach(m => parseWhatsApp(m.body));  */
+  parseWhatsApp();                                         // demo fallback
+}
+
+// ---- POWER BI: push the purchasing result -----------------------------
+async function pushToPowerBI() {
+  if (!LAST_RESULT) { alert('Run a calculation first.'); return; }
+  const payload = LAST_RESULT.lines.map(l => ({
+    ingredient: l.name, supplier: l.supplier, needed: l.need,
+    inStock: l.stock, orderQty: l.orderQty, estCost: l.cost,
+    timestamp: new Date().toISOString()
+  }));
+  // LIVE mode: send through the backend, which holds the Power BI push URL.
+  if (USE_BACKEND) {
+    try {
+      const res = await fetch('/api/push-powerbi', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      alert('Pushed ' + out.pushed + ' rows to ' + out.target + '.');
+    } catch (e) {
+      alert('Power BI push failed: ' + e.message);
+    }
+    return;
+  }
+  // DEMO mode: no backend, so just show what would be sent.
+  console.log('Power BI payload ready:', payload);
+  alert('Prepared ' + payload.length + ' rows for Power BI (see console). '
+        + 'Run the backend to push live.');
+}
+
+// ---- helpers ----------------------------------------------------------
+function setSyncStatus(msg) { document.getElementById('syncStatus').innerHTML = msg; }
+
+/* ==========================================================================
+   Config placeholders — fill in when integrating.
+   ========================================================================== */
+const CENTRIC_TOKEN    = '';   // TODO: Centric API bearer token / OAuth flow
+const POWERBI_PUSH_URL = '';   // TODO: Power BI streaming dataset push URL
+</script>
+</body>
+</html>

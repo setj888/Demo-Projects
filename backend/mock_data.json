@@ -1,0 +1,76 @@
+{
+  "_comment": "Single source of truth for MOCK data. Stands in for Centric (materials + recipes) and the ERP (stock) until the real APIs are wired in sources.py. 'materials' = what Centric returns (no stock). 'stock' = what the ERP returns (id -> current qty). 'dough' blocks are reused by recipes. 'fill' items are per 1kg finished product, in grams.",
+
+  "dough": {
+    "egg":   [ {"id":"flour00","qty":240}, {"id":"egg","qty":150}, {"id":"durum","qty":100}, {"id":"salt","qty":10}, {"id":"riceflour","qty":8} ],
+    "vegan": [ {"id":"durum","qty":320}, {"id":"water","qty":180}, {"id":"riceflour","qty":8} ]
+  },
+
+  "materials": [
+    {"id":"flour00",    "name":"Tipo 00 Flour",                 "unit":"kg", "pack":25,  "cost":1.10, "supplier":"Molino Italiano"},
+    {"id":"durum",      "name":"Durum Wheat Semolina",          "unit":"kg", "pack":25,  "cost":1.30, "supplier":"Molino Italiano"},
+    {"id":"egg",        "name":"Pasteurised Free-Range Egg",    "unit":"kg", "pack":20,  "cost":3.60, "supplier":"British Eggs Ltd"},
+    {"id":"salt",       "name":"Fine Sea Salt",                 "unit":"kg", "pack":25,  "cost":0.55, "supplier":"Pantry Supplies"},
+    {"id":"riceflour",  "name":"Rice Flour (dusting)",          "unit":"kg", "pack":25,  "cost":1.40, "supplier":"Molino Italiano"},
+    {"id":"water",      "name":"Water",                         "unit":"L",  "pack":1,   "cost":0.00, "supplier":"Mains"},
+    {"id":"ricotta",    "name":"Ricotta (Milk)",                "unit":"kg", "pack":6,   "cost":4.50, "supplier":"Latteria UK"},
+    {"id":"grana",      "name":"Italian Grated Cheese (Grana)", "unit":"kg", "pack":1,   "cost":9.20, "supplier":"Latteria UK"},
+    {"id":"goat",       "name":"Goat's Cheese",                 "unit":"kg", "pack":2,   "cost":8.80, "supplier":"Latteria UK"},
+    {"id":"gorgonzola", "name":"Gorgonzola",                    "unit":"kg", "pack":1.5, "cost":7.60, "supplier":"Latteria UK"},
+    {"id":"mozzarella", "name":"Mozzarella",                    "unit":"kg", "pack":3,   "cost":5.40, "supplier":"Latteria UK"},
+    {"id":"mascarpone", "name":"Mascarpone",                    "unit":"kg", "pack":2,   "cost":4.80, "supplier":"Latteria UK"},
+    {"id":"spinach",    "name":"Spinach",                       "unit":"kg", "pack":5,   "cost":2.80, "supplier":"Fresh Produce Co"},
+    {"id":"garlic",     "name":"Garlic",                        "unit":"kg", "pack":3,   "cost":3.20, "supplier":"Fresh Produce Co"},
+    {"id":"pumpkin",    "name":"Pumpkin",                       "unit":"kg", "pack":10,  "cost":1.40, "supplier":"Fresh Produce Co"},
+    {"id":"mushroom",   "name":"Mixed Italian Mushrooms",       "unit":"kg", "pack":5,   "cost":4.20, "supplier":"Fresh Produce Co"},
+    {"id":"peas",       "name":"Garden Peas",                   "unit":"kg", "pack":5,   "cost":1.60, "supplier":"Fresh Produce Co"},
+    {"id":"shallot",    "name":"Shallots",                      "unit":"kg", "pack":10,  "cost":2.20, "supplier":"Fresh Produce Co"},
+    {"id":"carrot",     "name":"Carrots",                       "unit":"kg", "pack":10,  "cost":0.75, "supplier":"Fresh Produce Co"},
+    {"id":"onion",      "name":"Onions",                        "unit":"kg", "pack":10,  "cost":0.70, "supplier":"Fresh Produce Co"},
+    {"id":"celery",     "name":"Celery",                        "unit":"kg", "pack":5,   "cost":1.60, "supplier":"Fresh Produce Co"},
+    {"id":"beetroot",   "name":"Beetroot",                      "unit":"kg", "pack":10,  "cost":1.20, "supplier":"Fresh Produce Co"},
+    {"id":"tomato",     "name":"Sun-dried Tomato",              "unit":"kg", "pack":5,   "cost":3.40, "supplier":"Cantina Supplies"},
+    {"id":"beef",       "name":"Braising Beef",                 "unit":"kg", "pack":5,   "cost":8.60, "supplier":"Smithfield Meats"},
+    {"id":"nduja",      "name":"Nduja Sausage",                 "unit":"kg", "pack":3,   "cost":9.20, "supplier":"Salumeria Italiana"},
+    {"id":"breadcrumbs","name":"Breadcrumbs",                   "unit":"kg", "pack":10,  "cost":1.50, "supplier":"Pantry Supplies"},
+    {"id":"sunflower",  "name":"Sunflower Oil",                 "unit":"L",  "pack":10,  "cost":1.80, "supplier":"Oils Direct"},
+    {"id":"oliveoil",   "name":"Extra Virgin Olive Oil",        "unit":"L",  "pack":5,   "cost":7.20, "supplier":"Oils Direct"},
+    {"id":"redwine",    "name":"Red Wine (cooking)",            "unit":"L",  "pack":6,   "cost":4.20, "supplier":"Cantina Supplies"},
+    {"id":"nutmeg",     "name":"Nutmeg (ground)",               "unit":"kg", "pack":1,   "cost":19.0, "supplier":"Spice Traders"},
+    {"id":"pepper",     "name":"Black Pepper (ground)",         "unit":"kg", "pack":1,   "cost":14.5, "supplier":"Spice Traders"},
+    {"id":"rosemary",   "name":"Fresh Rosemary",                "unit":"kg", "pack":1,   "cost":12.0, "supplier":"Fresh Produce Co"},
+    {"id":"sage",       "name":"Fresh Sage",                    "unit":"kg", "pack":1,   "cost":13.0, "supplier":"Fresh Produce Co"}
+  ],
+
+  "stock": {
+    "flour00":180, "durum":90, "egg":40, "salt":60, "riceflour":40, "water":9999,
+    "ricotta":22, "grana":14, "goat":6, "gorgonzola":5, "mozzarella":10, "mascarpone":8,
+    "spinach":18, "garlic":4, "pumpkin":30, "mushroom":15, "peas":20, "shallot":16,
+    "carrot":40, "onion":40, "celery":12, "beetroot":25, "tomato":8,
+    "beef":20, "nduja":6, "breadcrumbs":25, "sunflower":30, "oliveoil":25, "redwine":18,
+    "nutmeg":2, "pepper":2, "rosemary":2, "sage":1.5
+  },
+
+  "recipes": [
+    {"id":"spinach_ric_rav","name":"Spinach & Ricotta Ravioli","shape":"Ravioli","pcsPerKg":75,"yield":0.92,"dough":"egg",
+      "fill":[{"id":"spinach","qty":195},{"id":"ricotta","qty":195},{"id":"grana","qty":70},{"id":"sunflower","qty":20},{"id":"garlic","qty":10},{"id":"salt","qty":7},{"id":"nutmeg","qty":3}]},
+    {"id":"beef_rav","name":"Braised Beef Ravioli","shape":"Ravioli","pcsPerKg":75,"yield":0.88,"dough":"egg",
+      "fill":[{"id":"beef","qty":225},{"id":"carrot","qty":50},{"id":"onion","qty":45},{"id":"celery","qty":30},{"id":"breadcrumbs","qty":40},{"id":"grana","qty":30},{"id":"redwine","qty":30},{"id":"water","qty":30},{"id":"oliveoil","qty":10},{"id":"rosemary","qty":5},{"id":"salt","qty":3},{"id":"pepper","qty":2}]},
+    {"id":"four_cheese_rav","name":"Four Cheese Ravioli","shape":"Ravioli","pcsPerKg":75,"yield":0.93,"dough":"egg",
+      "fill":[{"id":"ricotta","qty":200},{"id":"goat","qty":100},{"id":"gorgonzola","qty":100},{"id":"grana","qty":90},{"id":"salt","qty":10}]},
+    {"id":"pumpkin_ric_rav","name":"Pumpkin & Ricotta Ravioli","shape":"Ravioli","pcsPerKg":75,"yield":0.90,"dough":"egg",
+      "fill":[{"id":"pumpkin","qty":275},{"id":"ricotta","qty":125},{"id":"breadcrumbs","qty":50},{"id":"grana","qty":30},{"id":"sage","qty":8},{"id":"salt","qty":8},{"id":"nutmeg","qty":4}]},
+    {"id":"mushroom_tort","name":"Mushroom & Cheese Tortelloni","shape":"Tortelloni","pcsPerKg":33,"yield":0.90,"dough":"egg",
+      "fill":[{"id":"mushroom","qty":300},{"id":"ricotta","qty":100},{"id":"grana","qty":60},{"id":"breadcrumbs","qty":25},{"id":"garlic","qty":5},{"id":"oliveoil","qty":5},{"id":"salt","qty":5}]},
+    {"id":"pea_shallot_veg","name":"Pea & Shallot Ravioli (Vegan)","shape":"Ravioli","pcsPerKg":75,"yield":0.91,"dough":"vegan",
+      "fill":[{"id":"peas","qty":355},{"id":"shallot","qty":100},{"id":"oliveoil","qty":30},{"id":"salt","qty":10},{"id":"pepper","qty":5}]},
+    {"id":"spinach_ric_tort","name":"Spinach & Ricotta Tortelloni","shape":"Tortelloni","pcsPerKg":33,"yield":0.90,"dough":"egg",
+      "fill":[{"id":"spinach","qty":195},{"id":"ricotta","qty":195},{"id":"grana","qty":70},{"id":"sunflower","qty":20},{"id":"garlic","qty":10},{"id":"salt","qty":7},{"id":"nutmeg","qty":3}]},
+    {"id":"tomato_mozz_tort","name":"Tomato & Mozzarella Tortelloni","shape":"Tortelloni","pcsPerKg":33,"yield":0.91,"dough":"egg",
+      "fill":[{"id":"mozzarella","qty":200},{"id":"tomato","qty":150},{"id":"breadcrumbs","qty":75},{"id":"grana","qty":45},{"id":"oliveoil","qty":20},{"id":"salt","qty":10}]},
+    {"id":"nduja_masc_tort","name":"Nduja & Mascarpone Tortelloni","shape":"Tortelloni","pcsPerKg":33,"yield":0.90,"dough":"egg",
+      "fill":[{"id":"nduja","qty":225},{"id":"mascarpone","qty":175},{"id":"grana","qty":50},{"id":"breadcrumbs","qty":40},{"id":"salt","qty":10}]},
+    {"id":"beetroot_goat_rav","name":"Beetroot & Goat Cheese Ravioli","shape":"Ravioli","pcsPerKg":75,"yield":0.90,"dough":"egg",
+      "fill":[{"id":"beetroot","qty":250},{"id":"goat","qty":150},{"id":"ricotta","qty":60},{"id":"breadcrumbs","qty":20},{"id":"oliveoil","qty":10},{"id":"salt","qty":10}]}
+  ]
+}
