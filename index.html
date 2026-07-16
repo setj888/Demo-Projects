@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>La Tua Pasta — Batch Ordering Planner</title>
+<title>PASTA CO — Batch Ordering Planner</title>
 <!--
   ============================================================================
-  LA TUA PASTA  —  BATCH ORDERING PLANNER  (base framework / prototype)
+  PASTA CO  —  BATCH ORDERING PLANNER  (base framework / prototype)
   ----------------------------------------------------------------------------
   Purpose: Take a batch of customer orders (product + kg) that arrive via
            WhatsApp, and work out how much of each RAW INGREDIENT must be
@@ -14,7 +14,7 @@
            filling ingredients, (b) applying a process-YIELD % to allow for
            production waste, and (c) checking current stock.
 
-  Data model is built from La Tua Pasta's real products (scraped July 2026):
+  Data model is built with synthetic recipe data approximating a typical fresh filled pasta manufacturer:
     • Every filled product = ~50% pasta dough + ~50% filling by weight.
     • Standard dough = Tipo 00 flour + pasteurised egg (30%) + durum wheat + salt.
     • Vegan line (Pea & Shallot) swaps egg for water.
@@ -22,8 +22,8 @@
       (Spinach & Ricotta and Braised Beef are exact); others are close
       estimates from the product descriptions — tune the %s to your specs.
 
-  Ingredients / recipes / yields / stock will ultimately come from CENTRIC.
-  Results can be pushed to POWER BI. Both are wired in the INTEGRATION LAYER
+  Ingredients / recipes / yields / stock will ultimately come from the companys integrated system.
+  All wired in the INTEGRATION LAYER
   at the bottom of the <script> — that is the ONLY section you change to go
   live. Everything else (UI + calculation) stays the same.
 
@@ -124,7 +124,7 @@
 <!-- ========================= LOGIN ========================= -->
 <div id="login">
   <div class="login-card">
-    <h1>🍝 La Tua Pasta</h1>
+    <h1>🍝 Pasta co</h1>
     <p class="muted" style="font-size:13px;margin:.2rem 0 0">Batch Ordering Planner — sign in</p>
     <label>Username</label>
     <input id="user" value="admin" autocomplete="username" />
@@ -140,7 +140,7 @@
 <!-- ========================= APP ========================= -->
 <div id="app" class="hidden">
   <header class="appbar">
-    <div class="brand">🍝 La Tua Pasta <span>· Ordering Planner</span></div>
+    <div class="brand">🍝 Pasta co <span>· Ordering Planner</span></div>
     <div class="sync-status" id="syncStatus">Data source: <b>Mock</b></div>
     <button class="ghost" onclick="logout()">Sign out</button>
   </header>
@@ -327,7 +327,7 @@ let INGREDIENTS = [
   { id:'sage',       name:'Fresh Sage',                    unit:'kg', stock:1.5, pack:1,  cost:13.0, supplier:'Fresh Produce Co' },
 ];
 
-/*  RECIPES — top 10 most popular La Tua Pasta products.
+/*  RECIPES — top 10 most popular Pasta co products.
     `yield`  = process yield (fraction). 0.90 => 10% waste, so you must input
                1 / 0.90 = 1.111 kg of raw material to make 1 kg finished.
     `pcsPerKg` = approx finished pieces per kg (display only).
