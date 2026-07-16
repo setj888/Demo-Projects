@@ -1,4 +1,4 @@
-# La Tua Pasta — Batch Ordering Planner
+# Demo (Pasta Co.)- Batch Ordering Planner
 
 A working prototype web app that turns a **batch of customer orders** (product + kg, arriving
 via WhatsApp) into a **raw-ingredient purchasing list** — exploding each product into its pasta
@@ -16,7 +16,7 @@ Double-click `index.html`. Opens in your browser — no install, no server, no i
    push to Power BI.
 4. **Ingredients & Stock** / **Recipes & Yields** — edit numbers to test scenarios.
 
-## The data model (built from La Tua Pasta's real site, scraped July 2026)
+## The data model (built with synthetic recipe data approximating a typical fresh filled pasta manufacturer)
 - Every filled product ≈ **50% pasta dough + 50% filling** by weight.
 - **Standard dough (30% egg):** Tipo 00 flour + pasteurised free-range egg + durum wheat + salt.
 - **Vegan line (Pea & Shallot):** dough swaps egg for water.
